@@ -19,16 +19,34 @@ const dashboardProducts = products.map((p, index) => ({
   sales: Math.floor(Math.random() * 10),
   variants: Math.floor(Math.random() * 20),
   location: index % 2 === 0 ? 'My store' : 'JS Mob',
-  valueImpact: index % 3 === 0 ? 'High' : index % 3 === 1 ? 'Med' : 'Low'
+  valueImpact: (index % 3 === 0 ? 'High' : index % 3 === 1 ? 'Med' : 'Low') as 'High' | 'Med' | 'Low'
 }));
 
+interface Product {
+  id: string;
+  name: string;
+  price: string;
+  numericPrice: number;
+  status: 'Active' | 'Draft' | 'Archived';
+  inventory: string;
+  sales: number;
+  variants: number;
+  cat: string;
+  location: string;
+  valueImpact: 'High' | 'Med' | 'Low';
+  tag: string;
+  desc: string;
+  image?: string;
+}
+
+
 export default function ProductsManagementPage() {
-  const [productList, setProductList] = useState(dashboardProducts);
+  const [productList, setProductList] = useState<Product[]>(dashboardProducts as Product[]);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [video, setVideo] = useState<string | null>(null);
 
@@ -85,7 +103,8 @@ export default function ProductsManagementPage() {
       image: '/placeholder.png',
       numericPrice: parseFloat(formData.get('price') as string) || 0,
       tag: 'New',
-      desc: 'Product description'
+      desc: 'Product description',
+      valueImpact: 'Med' as const
     };
     setProductList([newProduct, ...productList]);
     setImages([]);
