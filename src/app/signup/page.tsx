@@ -6,26 +6,33 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-export default function LoginPage() {
+export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      setLoading(false);
+      return;
+    }
+
     const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
     });
 
-    if (signInError) {
-      setError(signInError.message);
+    if (signUpError) {
+      setError(signUpError.message);
       setLoading(false);
     } else {
       router.push('/dashboard');
@@ -52,14 +59,14 @@ export default function LoginPage() {
 
             {/* Title & Sub */}
             <h1 className="font-display text-2xl font-black uppercase tracking-tight mb-1">
-              Log in to your account
+              Create an account
             </h1>
             <p className="text-xs font-bold text-muted-foreground tracking-widest uppercase mb-8">
-              Welcome back. Access your gear.
+              Join the future of retail.
             </p>
 
             {/* Form */}
-            <form className="space-y-4" onSubmit={handleLogin}>
+            <form className="space-y-4" onSubmit={handleSignup}>
               {error && (
                 <div className="p-3 text-xs font-bold text-red-500 bg-red-500/10 border border-red-500/20">
                   {error}
@@ -96,18 +103,18 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Fake Captcha Box */}
-              <div className="border border-foreground/10 p-3 flex items-center justify-between mt-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-foreground flex items-center justify-center">
-                    <div className="w-2.5 h-2.5 bg-green-500"></div>
-                  </div>
-                  <span className="text-xs font-bold">I am human</span>
-                </div>
-                <div className="text-[7px] font-bold uppercase tracking-widest text-center text-foreground/40 leading-tight">
-                  <span className="block text-sm mb-0.5">🤖</span>
-                  hCaptcha<br/>
-                  Privacy - Terms
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5">Confirm Password</label>
+                <div className="relative">
+                  <input 
+                    type="password" 
+                    name="confirmPassword"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••••••" 
+                    className="w-full border border-foreground/10 py-2.5 px-3 font-bold text-sm tracking-widest outline-none focus:border-foreground transition-colors pr-10"
+                    required
+                  />
                 </div>
               </div>
 
@@ -116,7 +123,7 @@ export default function LoginPage() {
                 disabled={loading}
                 className="w-full bg-[#1b1b1b] text-white font-bold text-xs tracking-widest uppercase py-3.5 hover:bg-black transition-colors mt-6 disabled:opacity-50"
               >
-                {loading ? 'Logging in...' : 'Log In'}
+                {loading ? 'Creating Account...' : 'Sign Up'}
               </button>
             </form>
 
@@ -126,9 +133,9 @@ export default function LoginPage() {
             </div>
 
             <div className="text-center">
-              <span className="text-[10px] font-bold text-foreground/60 mr-2">New here?</span>
-              <Link href="/signup" className="text-[10px] font-bold text-foreground tracking-widest uppercase hover:opacity-50 transition-opacity">
-                Create an account →
+              <span className="text-[10px] font-bold text-foreground/60 mr-2">Already have an account?</span>
+              <Link href="/login" className="text-[10px] font-bold text-foreground tracking-widest uppercase hover:opacity-50 transition-opacity">
+                Log In →
               </Link>
             </div>
           </div>
@@ -154,11 +161,11 @@ export default function LoginPage() {
 
             <div className="mt-auto relative z-10">
               <p className="font-display leading-tight text-xl xl:text-2xl font-black mb-4">
-                "The aesthetic is unapologetic, the checkout friction is zero. Setting up our global technical drops has never been easier."
+                "We set up our store in minutes. The performance and design are unmatched. Storely is the only choice."
               </p>
               
               <p className="font-bold text-[10px] tracking-widest uppercase text-background/60 mb-6">
-                Founder, VOID RUNNER
+                Founder, NEON DREAMS
               </p>
 
               <div className="flex gap-1.5">

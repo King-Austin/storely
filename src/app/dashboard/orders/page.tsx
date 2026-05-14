@@ -8,17 +8,25 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import BrutalistModal from '@/components/BrutalistModal';
-
-const mockOrders = [
-  { id: '#1001', customer: 'Alex Rivera', date: 'Oct 24, 10:12 AM', total: '$180.00', payment: 'Paid', fulfillment: 'Unfulfilled', items: 1, status: 'Active' },
-  { id: '#1002', customer: 'Jordan Smith', date: 'Oct 24, 09:45 AM', total: '$320.00', payment: 'Paid', fulfillment: 'Fulfilled', items: 2, status: 'Archived' },
-  { id: '#1003', customer: 'Casey Chen', date: 'Oct 23, 04:20 PM', total: '$145.00', payment: 'Pending', fulfillment: 'Unfulfilled', items: 1, status: 'Active' },
-  { id: '#1004', customer: 'Riley Taylor', date: 'Oct 23, 01:10 PM', total: '$560.00', payment: 'Paid', fulfillment: 'Unfulfilled', items: 3, status: 'Order Problem' },
-  { id: '#1005', customer: 'Morgan Lee', date: 'Oct 22, 11:30 AM', total: '$90.00', payment: 'Refunded', fulfillment: 'Cancelled', items: 1, status: 'Archived' },
-];
+import { useOrders, useVendorStore } from '@/hooks/useSupabaseData';
+import { createClient } from '@/lib/supabase/client';
 
 export default function OrdersPage() {
-  const [orderList, setOrderList] = useState(mockOrders);
+  const { store } = useVendorStore();
+  const { orders: dbOrders, loading, refetch } = useOrders(store?.id);
+  const supabase = createClient();
+
+  const mappedOrders = (dbOrders || []).map((o: any) => ({
+    id: o.id,
+    displayId: `#${o.id.slice(0, 4).toUpperCase()}`,
+    customer: o.customer_email || 'Guest User',
+    date: new Date(o.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true }),
+    total: `$${(o.total || 0).toFixed(2)}`,
+    payment: o.payment_status === 'paid' ? 'Paid' : o.payment_status === 'refunded' ? 'Refunded' : 'Pending',
+    fulfillment: o.status === 'delivered' ? 'Fulfilled' : o.status === 'cancelled' ? 'Cancelled' : 'Unfulfilled',
+    items: o.storely_order_items?.length || 1,
+    status: o.status === 'refunded' ? 'Archived' : o.status === 'cancelled' ? 'Order Problem' : 'Active',
+  }));
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
@@ -39,26 +47,26 @@ export default function OrdersPage() {
     document.body.removeChild(link);
   };
 
-  const handleCreateOrder = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateOrder = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!store?.id) return;
     const formData = new FormData(e.currentTarget);
-    const newOrder = {
-      id: `#${Math.floor(1000 + Math.random() * 9000)}`,
-      customer: formData.get('customer') as string,
-      date: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true }),
-      total: `$${formData.get('total')}`,
-      payment: 'Pending',
-      fulfillment: 'Unfulfilled',
-      items: 1,
-      status: 'Active'
-    };
-    setOrderList([newOrder, ...orderList]);
+    const customer = formData.get('customer') as string;
+    const total = parseFloat(formData.get('total') as string) || 0;
+
+    await supabase.from('storely_orders').insert({
+      store_id: store.id,
+      total: total,
+      payment_status: 'pending',
+      status: 'pending'
+    });
+    refetch();
     setIsCreateModalOpen(false);
   };
 
 
-  const filteredOrders = orderList.filter(order => {
-    const matchesSearch = order.customer.toLowerCase().includes(searchQuery.toLowerCase()) || order.id.includes(searchQuery);
+  const filteredOrders = mappedOrders.filter(order => {
+    const matchesSearch = order.customer.toLowerCase().includes(searchQuery.toLowerCase()) || order.displayId.includes(searchQuery);
     const matchesTab = (activeTab === 'All' && order.status !== 'Archived') || 
                       (activeTab === 'Unfulfilled' && order.fulfillment === 'Unfulfilled') ||
                       (activeTab === 'Fulfilled' && order.fulfillment === 'Fulfilled') ||
@@ -171,27 +179,31 @@ export default function OrdersPage() {
             <div className="flex items-center gap-1">
               {activeTab === 'Order Problem' ? (
                 <>
-                  <button onClick={() => {
-                    setOrderList(prev => prev.map(o => selectedOrders.includes(o.id) ? { ...o, status: 'Active' } : o));
+                  <button onClick={async () => {
+                    await supabase.from('storely_orders').update({ status: 'confirmed' }).in('id', selectedOrders);
+                    refetch();
                     toast.success(`Moved ${selectedOrders.length} orders back to All!`);
                     setSelectedOrders([]);
                   }} className="px-3 py-1.5 bg-white dark:bg-black border border-foreground/10 text-[10px] font-black uppercase tracking-widest hover:bg-secondary transition-colors">I am done with the order</button>
-                  <button onClick={() => {
-                    setOrderList(prev => prev.map(o => selectedOrders.includes(o.id) ? { ...o, payment: 'Refunded', status: 'Archived' } : o));
+                  <button onClick={async () => {
+                    await supabase.from('storely_orders').update({ payment_status: 'refunded', status: 'refunded' }).in('id', selectedOrders);
+                    refetch();
                     toast.success(`Refunded and archived ${selectedOrders.length} orders!`);
                     setSelectedOrders([]);
                   }} className="px-3 py-1.5 bg-red-100 text-red-700 border border-red-200 text-[10px] font-black uppercase tracking-widest hover:bg-red-200 transition-colors">Refund</button>
                 </>
               ) : activeTab !== 'Refunded' && activeTab !== 'Archived' ? (
                 <>
-                  <button onClick={() => {
-                    setOrderList(prev => prev.map(o => selectedOrders.includes(o.id) ? { ...o, status: 'Order Problem' } : o));
+                  <button onClick={async () => {
+                    await supabase.from('storely_orders').update({ status: 'cancelled' }).in('id', selectedOrders);
+                    refetch();
                     toast.success(`Moved ${selectedOrders.length} orders to Order Problem!`);
                     setSelectedOrders([]);
                   }} className="px-3 py-1.5 bg-white dark:bg-black border border-foreground/10 text-[10px] font-black uppercase tracking-widest hover:bg-secondary transition-colors">Move to Order Problem</button>
                   
-                  <button onClick={() => {
-                    setOrderList(prev => prev.map(o => selectedOrders.includes(o.id) ? { ...o, fulfillment: 'Fulfilled', status: 'Archived' } : o));
+                  <button onClick={async () => {
+                    await supabase.from('storely_orders').update({ status: 'delivered' }).in('id', selectedOrders);
+                    refetch();
                     toast.success(`Fulfilled and archived ${selectedOrders.length} orders!`);
                     setSelectedOrders([]);
                   }} className="px-3 py-1.5 bg-foreground text-background text-[10px] font-black uppercase tracking-widest hover:bg-foreground/90 transition-colors">Fulfill</button>
@@ -239,7 +251,7 @@ export default function OrdersPage() {
                       />
                     </td>
                     <td className="p-4">
-                      <span className="text-xs font-black uppercase underline underline-offset-4 decoration-foreground/20 hover:decoration-foreground transition-colors">{order.id}</span>
+                      <span className="text-xs font-black uppercase underline underline-offset-4 decoration-foreground/20 hover:decoration-foreground transition-colors">{order.displayId}</span>
                     </td>
                     <td className="p-4">
                       <span className="text-[10px] font-bold text-foreground/60 uppercase">{order.date}</span>
