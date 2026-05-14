@@ -1,0 +1,340 @@
+# Instincts generated from https://github.com/King-Austin/storely
+# Generated: 2026-05-14T15:24:25.123Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: storely-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/King-Austin/storely
+---
+
+# Storely Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat
+
+## Evidence
+
+- 1 commits analyzed
+- Detected conventional commit pattern
+- Examples: feat: complete Supabase integration for core modules (Products, Orders, Customers, Discounts, Settings)
+
+---
+id: storely-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/King-Austin/storely
+---
+
+# Storely Commit Length
+
+## Action
+
+Write detailed commit messages (~103 characters for first line)
+
+## Evidence
+
+- Average commit message length: 103 chars
+- Based on 1 commits
+
+---
+id: storely-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/King-Austin/storely
+---
+
+# Storely Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: storely-import-alias
+trigger: "when importing modules"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/King-Austin/storely
+---
+
+# Storely Import Alias
+
+## Action
+
+Use path aliases (@/, ~/) instead of relative imports
+
+## Evidence
+
+- Import analysis shows alias pattern
+- Example: import { x } from '@/lib/x'
+
+---
+id: storely-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/King-Austin/storely
+---
+
+# Storely Export Style
+
+## Action
+
+Prefer default exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: default
+
+---
+id: storely-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/King-Austin/storely
+---
+
+# Storely Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: app, data, hooks, lib
+
+---
+id: storely-test-colocate
+trigger: "when writing tests"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/King-Austin/storely
+---
+
+# Storely Test Colocate
+
+## Action
+
+Place test file next to the source file (e.g., Button.test.tsx next to Button.tsx)
+
+## Evidence
+
+- Colocated test pattern detected
+- Tests live alongside source files
+
+---
+id: storely-instinct-file-naming
+trigger: "When creating a new file in the codebase"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: King-Austin/storely
+---
+
+# Storely Instinct File Naming
+
+## Action
+
+Name the file using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.files: camelCase
+
+---
+id: storely-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: King-Austin/storely
+---
+
+# Storely Instinct Function Naming
+
+## Action
+
+Use camelCase for the function name
+
+## Evidence
+
+- Pattern in namingConventions.functions: camelCase
+
+---
+id: storely-instinct-class-naming
+trigger: "When creating a new class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: King-Austin/storely
+---
+
+# Storely Instinct Class Naming
+
+## Action
+
+Use PascalCase for the class name
+
+## Evidence
+
+- Pattern in namingConventions.classes: PascalCase
+
+---
+id: storely-instinct-constant-naming
+trigger: "When declaring a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: King-Austin/storely
+---
+
+# Storely Instinct Constant Naming
+
+## Action
+
+Use SCREAMING_SNAKE_CASE for the constant name
+
+## Evidence
+
+- Pattern in namingConventions.constants: SCREAMING_SNAKE_CASE
+
+---
+id: storely-instinct-import-alias
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: King-Austin/storely
+---
+
+# Storely Instinct Import Alias
+
+## Action
+
+Use import aliases instead of relative paths
+
+## Evidence
+
+- Pattern in importStyle: alias
+
+---
+id: storely-instinct-export-default
+trigger: "When exporting a module or component"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: King-Austin/storely
+---
+
+# Storely Instinct Export Default
+
+## Action
+
+Use default export style
+
+## Evidence
+
+- Pattern in exportStyle: default
+
+---
+id: storely-instinct-commit-conventional
+trigger: "When making a git commit"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: King-Austin/storely
+---
+
+# Storely Instinct Commit Conventional
+
+## Action
+
+Format the commit message using the conventional commit style, starting with 'feat:'
+
+## Evidence
+
+- Pattern in commits.type: conventional
+- commits.prefixes: ["feat"]
+- Example: 'feat: complete Supabase integration for core modules (Products, Orders, Customers, Discounts, Settings)'
+
+---
+id: storely-instinct-test-colocation
+trigger: "When adding a test for a module or component"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: King-Austin/storely
+---
+
+# Storely Instinct Test Colocation
+
+## Action
+
+Place the test file in the same folder as the code it tests
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation: colocated
+
+---
+id: storely-instinct-test-folder-structure
+trigger: "When organizing code and tests"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: King-Austin/storely
+---
+
+# Storely Instinct Test Folder Structure
+
+## Action
+
+Use the folder structure: src/app, src/data, src/hooks, src/lib, with tests colocated
+
+## Evidence
+
+- Pattern in architecture.folderStructure.srcLayout
+- Pattern in architecture.folderStructure.testLocation: colocated
+
+---
+id: storely-instinct-error-handling-try-catch
+trigger: "When handling errors in code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: King-Austin/storely
+---
+
+# Storely Instinct Error Handling Try Catch
+
+## Action
+
+Use try-catch blocks for error handling
+
+## Evidence
+
+- Pattern in errorHandling.style: try-catch
+
