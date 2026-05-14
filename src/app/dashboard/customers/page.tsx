@@ -10,17 +10,23 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import BrutalistModal from '@/components/BrutalistModal';
-
-const mockCustomers = [
-  { id: 'u1', name: 'Alex Rivera', email: 'alex@rivera.com', orders: 12, spent: '$1,240.00', location: 'New York, US', status: 'Active' },
-  { id: 'u2', name: 'Jordan Smith', email: 'j.smith@void.com', orders: 4, spent: '$320.00', location: 'London, UK', status: 'New' },
-  { id: 'u3', name: 'Casey Chen', email: 'casey.c@void.com', orders: 1, spent: '$145.00', location: 'Toronto, CA', status: 'New' },
-  { id: 'u4', name: 'Riley Taylor', email: 'riley@taylor.tech', orders: 28, spent: '$5,600.00', location: 'Berlin, DE', status: 'VIP' },
-  { id: 'u5', name: 'Morgan Lee', email: 'morgan@lee.com', orders: 0, spent: '$0.00', location: 'Seoul, KR', status: 'Prospect' },
-];
+import { useCustomers, useVendorStore } from '@/hooks/useSupabaseData';
+import { createClient } from '@/lib/supabase/client';
 
 export default function CustomersPage() {
-  const [customerList, setCustomerList] = useState(mockCustomers);
+  const { store } = useVendorStore();
+  const { customers: dbCustomers, loading, refetch } = useCustomers(store?.id);
+  const supabase = createClient();
+
+  const mappedCustomers = (dbCustomers || []).map((c: any) => ({
+    id: c.id,
+    name: c.name || 'Unknown',
+    email: c.email || '',
+    orders: c.total_orders || 0,
+    spent: `$${(c.total_spent || 0).toFixed(2)}`,
+    location: c.location || 'Unknown',
+    status: c.status === 'vip' ? 'VIP' : c.status === 'active' ? 'Active' : c.status === 'new' ? 'New' : 'Prospect'
+  }));
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
@@ -40,42 +46,47 @@ export default function CustomersPage() {
     document.body.removeChild(link);
   };
 
-  const handleAddCustomer = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!store?.id) return;
     const formData = new FormData(e.currentTarget);
-    const newCustomer = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: formData.get('name') as string,
-      email: formData.get('email') as string,
-      orders: 0,
-      spent: '$0.00',
-      location: formData.get('location') as string || 'Unknown',
-      status: 'New'
-    };
-    setCustomerList([newCustomer, ...customerList]);
+    const name = formData.get('name') as string;
+    const email = formData.get('email') as string;
+    const location = formData.get('location') as string || 'Unknown';
+
+    await supabase.from('storely_customers').insert({
+      store_id: store.id,
+      name,
+      email,
+      location,
+      status: 'new'
+    });
+
+    refetch();
     setIsAddModalOpen(false);
+    toast.success('Customer profile created!');
   };
 
-  const handleEditCustomer = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleEditCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingCustomer) return;
     const formData = new FormData(e.currentTarget);
-    setCustomerList(prev => prev.map(c => {
-      if (c.id === editingCustomer.id) {
-        return {
-          ...c,
-          name: formData.get('name') as string,
-          email: formData.get('email') as string,
-          location: formData.get('location') as string || c.location,
-        };
-      }
-      return c;
-    }));
+    const name = formData.get('name') as string;
+    const email = formData.get('email') as string;
+    const location = formData.get('location') as string || editingCustomer.location;
+
+    await supabase.from('storely_customers').update({
+      name,
+      email,
+      location
+    }).eq('id', editingCustomer.id);
+
+    refetch();
     toast.success('Customer profile updated!');
     setEditingCustomer(null);
   };
 
-  const filteredCustomers = customerList.filter(customer => {
+  const filteredCustomers = mappedCustomers.filter(customer => {
     const matchesSearch = customer.name.toLowerCase().includes(searchQuery.toLowerCase()) || customer.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesTab = activeTab === 'All' || 
                       (activeTab === 'New' && customer.status === 'New') ||
@@ -157,7 +168,7 @@ export default function CustomersPage() {
             <h3 className="text-[10px] font-black uppercase tracking-widest">Total Customers</h3>
           </div>
           <div className="flex items-end gap-2">
-            <span className="text-2xl font-black">{customerList.length}</span>
+            <span className="text-2xl font-black">{mappedCustomers.length}</span>
             <span className="text-[10px] font-bold text-green-500 flex items-center mb-1">
               <TrendingUp size={10} className="mr-0.5" /> +12%
             </span>

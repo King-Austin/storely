@@ -8,45 +8,35 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { products } from '@/data/products';
 import BrutalistModal from '@/components/BrutalistModal';
-
-// Mocked extended data to match the UI
-const dashboardProducts = products.map((p, index) => ({
-  ...p,
-  status: index % 3 === 0 ? 'Active' : index % 3 === 1 ? 'Draft' : 'Archived',
-  inventory: Math.floor(Math.random() * 10) + ' In stock',
-  sales: Math.floor(Math.random() * 10),
-  variants: Math.floor(Math.random() * 20),
-  location: index % 2 === 0 ? 'My store' : 'JS Mob',
-  valueImpact: (index % 3 === 0 ? 'High' : index % 3 === 1 ? 'Med' : 'Low') as 'High' | 'Med' | 'Low'
-}));
-
-interface Product {
-  id: string;
-  name: string;
-  price: string;
-  numericPrice: number;
-  status: 'Active' | 'Draft' | 'Archived';
-  inventory: string;
-  sales: number;
-  variants: number;
-  cat: string;
-  location: string;
-  valueImpact: 'High' | 'Med' | 'Low';
-  tag: string;
-  desc: string;
-  image?: string;
-}
-
+import { useProducts, useVendorStore } from '@/hooks/useSupabaseData';
+import { createClient } from '@/lib/supabase/client';
 
 export default function ProductsManagementPage() {
-  const [productList, setProductList] = useState<Product[]>(dashboardProducts as Product[]);
+  const { store } = useVendorStore();
+  const { products: dbProducts, loading, refetch } = useProducts(store?.id);
+  const supabase = createClient();
+
+  const mappedProducts = (dbProducts || []).map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    price: `$${(p.price || 0).toFixed(2)}`,
+    numericPrice: p.price || 0,
+    status: p.status === 'active' ? 'Active' : p.status === 'draft' ? 'Draft' : 'Archived',
+    inventory: `${p.stock_quantity || 0} In stock`,
+    sales: 0,
+    variants: 1,
+    cat: p.category_id || 'Uncategorized',
+    location: 'My store',
+    valueImpact: 'Med' as string,
+    tag: 'New',
+    desc: p.description || '',
+  }));
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [video, setVideo] = useState<string | null>(null);
 
@@ -68,7 +58,7 @@ export default function ProductsManagementPage() {
   };
 
   // Filter logic
-  const filteredProducts = productList.filter(product => {
+  const filteredProducts = mappedProducts.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesTab = activeTab === 'All' || product.status === activeTab;
     return matchesSearch && matchesTab;
@@ -87,46 +77,41 @@ export default function ProductsManagementPage() {
     document.body.removeChild(link);
   };
 
-  const handleAddProduct = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddProduct = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!store?.id) return;
     const formData = new FormData(e.currentTarget);
-    const newProduct = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: formData.get('name') as string,
-      price: formData.get('price') as string,
-      status: 'Active' as const,
-      inventory: '10 In stock',
-      sales: 0,
-      variants: 1,
-      cat: 'New Arrival',
-      location: 'My store',
-      image: '/placeholder.png',
-      numericPrice: parseFloat(formData.get('price') as string) || 0,
-      tag: 'New',
-      desc: 'Product description',
-      valueImpact: 'Med' as const
-    };
-    setProductList([newProduct, ...productList]);
+    const name = formData.get('name') as string;
+    const price = parseFloat(formData.get('price') as string) || 0;
+
+    await supabase.from('storely_products').insert({
+      store_id: store.id,
+      name,
+      price,
+      status: 'active',
+      slug: name.toLowerCase().replace(/\s+/g, '-'),
+      stock_quantity: 10,
+    });
+
+    refetch();
     setImages([]);
     setVideo(null);
     setIsAddModalOpen(false);
+    toast.success('Product added successfully!');
   };
 
-  const handleEditProduct = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleEditProduct = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingProduct) return;
     const formData = new FormData(e.currentTarget);
-    setProductList(prev => prev.map(p => {
-      if (p.id === editingProduct.id) {
-        return {
-          ...p,
-          name: formData.get('name') as string,
-          price: formData.get('price') as string,
-          numericPrice: parseFloat(formData.get('price') as string) || 0,
-        };
-      }
-      return p;
-    }));
+    const name = formData.get('name') as string;
+    const price = parseFloat(formData.get('price') as string) || 0;
+
+    await supabase.from('storely_products')
+      .update({ name, price })
+      .eq('id', editingProduct.id);
+
+    refetch();
     toast.success('Product updated successfully!');
     setEditingProduct(null);
     setImages([]);
@@ -147,15 +132,20 @@ export default function ProductsManagementPage() {
     }
   };
 
-  const handleBulkStatusChange = (newStatus: 'Active' | 'Draft' | 'Archived') => {
-    setProductList(prev => prev.map(p => 
-      selectedProducts.includes(p.id) ? { ...p, status: newStatus } : p
-    ));
+  const handleBulkStatusChange = async (newStatus: 'Active' | 'Draft' | 'Archived') => {
+    const dbStatus = newStatus.toLowerCase();
+    await supabase.from('storely_products')
+      .update({ status: dbStatus })
+      .in('id', selectedProducts);
+    refetch();
     setSelectedProducts([]);
   };
 
-  const handleDeleteSelected = () => {
-    setProductList(prev => prev.filter(p => !selectedProducts.includes(p.id)));
+  const handleDeleteSelected = async () => {
+    await supabase.from('storely_products')
+      .delete()
+      .in('id', selectedProducts);
+    refetch();
     setSelectedProducts([]);
   };
 
@@ -253,7 +243,7 @@ export default function ProductsManagementPage() {
           </div>
           <div className="space-y-1">
             <div className="flex items-end gap-2">
-              <span className="text-3xl font-black tracking-tighter">{productList.length > 0 ? '12.4%' : '0%'}</span>
+              <span className="text-3xl font-black tracking-tighter">{mappedProducts.length > 0 ? '12.4%' : '0%'}</span>
               <span className="text-[10px] font-bold text-green-500 mb-1">+2.1%</span>
             </div>
             <div className="h-1.5 w-full bg-secondary/30 border border-foreground/5 p-[1px]">
@@ -273,7 +263,7 @@ export default function ProductsManagementPage() {
               <span className="text-xs font-black uppercase tracking-tight">Healthy Status</span>
             </div>
             <p className="text-[10px] font-bold text-foreground/60 uppercase tracking-widest leading-relaxed">
-              {productList.length > 0 ? 'Average 42 days of stock remaining across top 80% of catalog' : 'Awaiting inventory synchronization data'}
+              {mappedProducts.length > 0 ? 'Average 42 days of stock remaining across top 80% of catalog' : 'Awaiting inventory synchronization data'}
             </p>
           </div>
         </div>

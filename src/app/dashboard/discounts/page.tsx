@@ -9,17 +9,24 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BrutalistModal from '@/components/BrutalistModal';
-
-const mockDiscounts = [
-  { id: 'd1', code: 'WINTER26', type: 'Percentage', value: '20%', usage: 142, status: 'Active', end: 'Dec 31' },
-  { id: 'd2', code: 'SHIPFREE', type: 'Free Shipping', value: 'Free', usage: 840, status: 'Active', end: 'Ongoing' },
-  { id: 'd3', code: 'WELCOME10', type: 'Fixed Amount', value: '$10.00', usage: 1204, status: 'Active', end: 'Ongoing' },
-  { id: 'd4', code: 'BLACKFRIDAY', type: 'Percentage', value: '50%', usage: 0, status: 'Scheduled', end: 'Nov 30' },
-  { id: 'd5', code: 'EXPIRED20', type: 'Percentage', value: '20%', usage: 450, status: 'Expired', end: 'Oct 01' },
-];
+import { useDiscounts, useVendorStore } from '@/hooks/useSupabaseData';
+import { createClient } from '@/lib/supabase/client';
 
 export default function DiscountsPage() {
-  const [discountList, setDiscountList] = useState(mockDiscounts);
+  const { store } = useVendorStore();
+  const { discounts: dbDiscounts, loading, refetch } = useDiscounts(store?.id);
+  const supabase = createClient();
+
+  const mappedDiscounts = (dbDiscounts || []).map((d: any) => ({
+    id: d.id,
+    code: d.code || '',
+    type: d.type === 'percentage' ? 'Percentage' : d.type === 'fixed' ? 'Fixed Amount' : 'Free Shipping',
+    value: d.type === 'percentage' ? `${d.value}%` : d.type === 'fixed' ? `$${(d.value || 0).toFixed(2)}` : 'Free',
+    usage: d.usage_count || 0,
+    status: d.is_active ? 'Active' : 'Expired',
+    end: d.expires_at ? new Date(d.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Ongoing',
+    rawValue: d.value
+  }));
   const [selectedDiscounts, setSelectedDiscounts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
@@ -32,43 +39,57 @@ export default function DiscountsPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const handleCreateDiscount = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateDiscount = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!store?.id) return;
     const formData = new FormData(e.currentTarget);
-    const newDiscount = {
-      id: Math.random().toString(36).substr(2, 9),
-      code: (formData.get('code') as string).toUpperCase(),
-      type: formData.get('type') as string,
-      value: formData.get('value') as string,
-      usage: 0,
-      status: 'Active',
-      end: 'Ongoing'
-    };
-    setDiscountList([newDiscount, ...discountList]);
+    const code = (formData.get('code') as string).toUpperCase();
+    const uiType = formData.get('type') as string;
+    let type = 'percentage';
+    if (uiType === 'Fixed Amount') type = 'fixed';
+    else if (uiType === 'Free Shipping') type = 'free_shipping';
+    
+    let rawValue = parseFloat(formData.get('value') as string);
+    if (isNaN(rawValue)) rawValue = 0;
+
+    await supabase.from('storely_discounts').insert({
+      store_id: store.id,
+      code,
+      type,
+      value: rawValue,
+      is_active: true
+    });
+
+    refetch();
     setIsCreateModalOpen(false);
-    showToast(`Discount code ${newDiscount.code} activated!`);
+    showToast(`Discount code ${code} activated!`);
   };
 
-  const handleEditDiscount = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleEditDiscount = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingDiscount) return;
     const formData = new FormData(e.currentTarget);
-    setDiscountList(prev => prev.map(d => {
-      if (d.id === editingDiscount.id) {
-        return {
-          ...d,
-          code: (formData.get('code') as string).toUpperCase(),
-          type: formData.get('type') as string,
-          value: formData.get('value') as string,
-        };
-      }
-      return d;
-    }));
-    showToast(`Promotion ${editingDiscount.code} updated!`);
+    const code = (formData.get('code') as string).toUpperCase();
+    const uiType = formData.get('type') as string;
+    let type = 'percentage';
+    if (uiType === 'Fixed Amount') type = 'fixed';
+    else if (uiType === 'Free Shipping') type = 'free_shipping';
+    
+    let rawValue = parseFloat(formData.get('value') as string);
+    if (isNaN(rawValue)) rawValue = 0;
+
+    await supabase.from('storely_discounts').update({
+      code,
+      type,
+      value: rawValue
+    }).eq('id', editingDiscount.id);
+
+    refetch();
+    showToast(`Promotion ${code} updated!`);
     setEditingDiscount(null);
   };
 
-  const filteredDiscounts = discountList.filter(discount => {
+  const filteredDiscounts = mappedDiscounts.filter(discount => {
     const matchesSearch = discount.code.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesTab = activeTab === 'All' || discount.status === activeTab;
     return matchesSearch && matchesTab;
@@ -138,12 +159,11 @@ export default function DiscountsPage() {
               <select name="type" defaultValue={editingDiscount?.type || "Percentage"} className="w-full bg-secondary/20 border-2 border-foreground p-3 text-xs font-black uppercase outline-none">
                 <option>Percentage</option>
                 <option>Fixed Amount</option>
-                <option>Free Shipping</option>
               </select>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black uppercase tracking-widest opacity-40">Value</label>
-              <input required name="value" defaultValue={editingDiscount?.value || ""} className="w-full bg-secondary/20 border-2 border-foreground p-3 text-xs font-black uppercase outline-none" placeholder="20% or $10" />
+              <input required name="value" type="number" step="0.01" defaultValue={editingDiscount?.rawValue || ""} className="w-full bg-secondary/20 border-2 border-foreground p-3 text-xs font-black uppercase outline-none" placeholder="20 or 10" />
             </div>
           </div>
           <button type="submit" className="w-full py-4 bg-foreground text-background font-black text-xs uppercase tracking-widest hover:bg-foreground/90 transition-all">
@@ -185,13 +205,16 @@ export default function DiscountsPage() {
           <div className="bg-secondary/50 px-4 py-3 border-b border-foreground/10 flex items-center justify-between animate-in fade-in slide-in-from-top-1">
             <span className="text-xs font-black uppercase tracking-widest text-foreground">{selectedDiscounts.length} selected</span>
             <div className="flex items-center gap-1">
-              <button onClick={() => {
+              <button onClick={async () => {
+                await supabase.from('storely_discounts').update({ is_active: false }).in('id', selectedDiscounts);
+                refetch();
                 showToast(`Deactivated ${selectedDiscounts.length} discounts`);
                 setSelectedDiscounts([]);
               }} className="px-3 py-1.5 bg-white dark:bg-black border border-foreground/10 text-[10px] font-black uppercase tracking-widest hover:bg-secondary transition-colors">Deactivate</button>
-              <button onClick={() => {
+              <button onClick={async () => {
+                await supabase.from('storely_discounts').delete().in('id', selectedDiscounts);
+                refetch();
                 showToast(`Deleted ${selectedDiscounts.length} discounts`);
-                setDiscountList(prev => prev.filter(d => !selectedDiscounts.includes(d.id)));
                 setSelectedDiscounts([]);
               }} className="px-3 py-1.5 bg-white dark:bg-black border border-red-500/20 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500 hover:text-white transition-colors">Delete</button>
             </div>

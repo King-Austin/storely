@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Save, Building2, CreditCard, Users, Bell, Shield, Package, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { useVendorStore } from '@/hooks/useSupabaseData';
+import { createClient } from '@/lib/supabase/client';
 
 const TABS = [
   { id: 'general', label: 'General', icon: Building2 },
@@ -16,15 +18,27 @@ const TABS = [
 ];
 
 export default function SettingsPage() {
+  const { store, refetch } = useVendorStore();
+  const supabase = createClient();
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
+  const [storeName, setStoreName] = useState('');
+  const [currency, setCurrency] = useState('USD');
 
-  const handleSave = () => {
+  useEffect(() => {
+    if (store) {
+      setStoreName(store.name || '');
+      setCurrency(store.currency || 'USD');
+    }
+  }, [store]);
+
+  const handleSave = async () => {
+    if (!store?.id) return;
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      toast.success('Settings saved successfully!');
-    }, 1000);
+    await supabase.from('storely_stores').update({ name: storeName, currency }).eq('id', store.id);
+    refetch();
+    setIsSaving(false);
+    toast.success('Settings saved successfully!');
   };
 
   return (
@@ -81,7 +95,7 @@ export default function SettingsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase tracking-widest">Store Name</label>
-                      <input defaultValue="Storely" className="w-full p-4 bg-secondary/30 border border-foreground/20 font-black text-sm uppercase focus:outline-none focus:border-foreground" />
+                      <input value={storeName} onChange={(e) => setStoreName(e.target.value)} className="w-full p-4 bg-secondary/30 border border-foreground/20 font-black text-sm uppercase focus:outline-none focus:border-foreground" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase tracking-widest">Support Email</label>
@@ -104,10 +118,11 @@ export default function SettingsPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest">Primary Currency</label>
-                    <select className="w-full p-4 bg-secondary/30 border border-foreground/20 font-black text-sm uppercase focus:outline-none focus:border-foreground appearance-none">
-                      <option>USD - US Dollar</option>
-                      <option>EUR - Euro</option>
-                      <option>GBP - British Pound</option>
+                    <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full p-4 bg-secondary/30 border border-foreground/20 font-black text-sm uppercase focus:outline-none focus:border-foreground appearance-none">
+                      <option value="USD">USD - US Dollar</option>
+                      <option value="EUR">EUR - Euro</option>
+                      <option value="GBP">GBP - British Pound</option>
+                      <option value="NGN">NGN - Nigerian Naira</option>
                     </select>
                   </div>
                 </>

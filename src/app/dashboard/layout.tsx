@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
@@ -11,6 +11,8 @@ import {
   CreditCard, History, Gift
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { createClient } from '@/lib/supabase/client';
+import { useVendorStore } from '@/hooks/useSupabaseData';
 
 const mainNavigation = [
   { name: 'Home', href: '/dashboard', icon: Home },
@@ -89,12 +91,32 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [openMenus, setOpenMenus] = useState<string[]>([]);
+  const { store, loading, refetch } = useVendorStore();
 
   const toggleMenu = (name: string) => {
     setOpenMenus(prev => 
       prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
     );
   };
+
+  useEffect(() => {
+    async function checkStore() {
+      if (!loading && store === null) {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('storely_stores').insert({
+            owner_id: user.id,
+            name: 'My Store',
+            slug: `store-${user.id.slice(0, 8)}`,
+            currency: 'NGN',
+          });
+          refetch();
+        }
+      }
+    }
+    checkStore();
+  }, [loading, store, refetch]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-secondary/30">
@@ -323,7 +345,14 @@ export default function DashboardLayout({
             <Settings size={18} className="text-foreground/50" strokeWidth={2.5} />
             Settings
           </button>
-          <button onClick={() => router.push('/login')} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold tracking-wide text-foreground/70 hover:bg-black/5 hover:text-foreground transition-colors">
+          <button 
+            onClick={async () => {
+              const supabase = createClient();
+              await supabase.auth.signOut();
+              router.push('/login');
+            }} 
+            className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold tracking-wide text-foreground/70 hover:bg-black/5 hover:text-foreground transition-colors"
+          >
             <LogOut size={18} className="text-foreground/50" strokeWidth={2.5} />
             Log Out
           </button>

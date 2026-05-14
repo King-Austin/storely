@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { updateSession } from '@/lib/supabase/middleware';
 
 // Basic in-memory rate limiting for Edge Runtime
 // Note: This is per Edge Isolate, but it effectively catches high-frequency bursts from the same source
 const rateLimitMap = new Map();
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const forwarded = request.headers.get('x-forwarded-for');
   const ip = forwarded ? forwarded.split(',')[0] : '127.0.0.1';
   const now = Date.now();
@@ -44,7 +45,8 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  // Call Supabase auth middleware
+  return await updateSession(request);
 }
 
 // Only run middleware on API routes and specific pages if needed
